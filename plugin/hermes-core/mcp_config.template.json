@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "hermes-core": {
+      "command": "__PYTHON_EXE__",
+      "args": [
+        "-u",
+        "__MCP_SERVER_PATH__"
+      ],
+      "env": {
+        "PYTHONUTF8": "1",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}

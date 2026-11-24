@@ -1,0 +1,37 @@
+{
+  "hermes-core": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "__HOOK_COMMAND__",
+        "timeout": 15
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "__HOOK_COMMAND__",
+        "timeout": 5
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__HOOK_COMMAND__",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "__HOOK_COMMAND__",
+        "timeout": 15
+      }
+    ]
+  }
+}

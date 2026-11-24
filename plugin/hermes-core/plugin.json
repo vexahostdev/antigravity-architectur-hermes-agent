@@ -1,0 +1,4 @@
+{
+  "name": "hermes-core",
+  "description": "Closed learning loop for Antigravity: bounded live memory, SQLite FTS5 cross-session recall, curated skills, and periodic learning review hooks."
+}
