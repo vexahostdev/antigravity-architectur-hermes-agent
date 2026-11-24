@@ -2,7 +2,11 @@
   <p>
     <img src="assets/logos/antigravity-logo.png" alt="Google Antigravity" height="72" />
     &nbsp;&nbsp;&nbsp;&nbsp;
-    <img src="assets/logos/hermes-logo.png" alt="Hermes Agent" height="76" />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/logos/hermes-logo-dark.png" />
+      <source media="(prefers-color-scheme: light)" srcset="assets/logos/hermes-logo-light.png" />
+      <img src="assets/logos/hermes-logo-light.png" alt="Hermes Agent" height="72" />
+    </picture>
   </p>
 
   <h1>Antigravity x Hermes Core</h1>
@@ -26,7 +30,8 @@
     <a href="#real-world-antigravity-fixes-baked-in">Pitfalls</a> &middot;
     <a href="PROMPT.md">Zero-clone prompt</a> &middot;
     <a href="INSTALL_FOR_AGENTS.md">Agent spec</a> &middot;
-    <a href="#verification">Verification</a>
+    <a href="#verification">Verification</a> &middot;
+    <a href="#recall--latency-benchmark">Benchmark</a>
   </p>
 
   <p><code>python install.py --mode standalone</code></p>
@@ -215,15 +220,32 @@ It exercises `install.py` (deployment, upgrade rule preservation, and `--uninsta
 
 ---
 
-## Star history
+## Recall & latency benchmark
 
-<a href="https://www.star-history.com/#vexahostdev/antigravity-architectur-hermes-agent&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=vexahostdev/antigravity-architectur-hermes-agent&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=vexahostdev/antigravity-architectur-hermes-agent&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=vexahostdev/antigravity-architectur-hermes-agent&type=Date" />
-  </picture>
-</a>
+SQLite WAL + FTS5 `session_search` latency and speedup vs. raw JSONL transcript scanning across 100 to 10,000 messages (5 to 500 rooms), while Stock Antigravity starts every New Chat with 0% cross-room recall.
+
+```mermaid
+---
+config:
+  look: handDrawn
+---
+xychart-beta
+    title "FTS5 session_search Speedup vs Raw JSONL Scan (x faster)"
+    x-axis ["100 msgs", "500 msgs", "1k msgs", "2.5k msgs", "5k msgs", "10k msgs"]
+    y-axis "Speedup (x faster)" 0 --> 70
+    line [0.8, 3.7, 7.0, 18.2, 29.8, 64.3]
+```
+
+| Messages | Sessions (rooms) | FTS5 `session_search` | Raw JSONL scan | Speedup | Exact recall |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 100 | 5 | 1.65 ms | 1.25 ms | 0.8x | 100% |
+| 500 | 25 | 1.69 ms | 6.21 ms | 3.7x | 100% |
+| 1,000 | 50 | 1.79 ms | 12.51 ms | 7.0x | 100% |
+| 2,500 | 125 | 1.68 ms | 30.52 ms | 18.2x | 100% |
+| 5,000 | 250 | 2.20 ms | 65.68 ms | 29.8x | 100% |
+| 10,000 | 500 | 1.94 ms | 124.75 ms | 64.3x | 100% |
+
+Reproduce locally in an isolated temporary directory: `python3 tests/benchmark.py` (use `python` on Windows).
 
 ---
 
