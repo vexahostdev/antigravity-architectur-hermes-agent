@@ -63,17 +63,36 @@ def run_hook(plugin_dir: Path, payload: dict, env: dict[str, str]) -> dict:
 
 def test_installer_isolated(tmp: Path) -> Path:
     cfg_root = tmp / "gemini_config"
+    scratch_dir = tmp / "scratch_space"
+    projects_dir = tmp / "projects_root"
     proc = subprocess.run(
-        [PY, str(REPO_ROOT / "install.py"), "--config-root", str(cfg_root), "--mode", "standalone", "--skip-backfill"],
+        [
+            PY,
+            str(REPO_ROOT / "install.py"),
+            "--config-root",
+            str(cfg_root),
+            "--mode",
+            "standalone",
+            "--scratch-dir",
+            str(scratch_dir),
+            "--projects-dir",
+            str(projects_dir),
+            "--skip-backfill",
+        ],
         capture_output=True,
         text=True,
         check=True,
     )
     out = json.loads(proc.stdout)
     assert out["success"] is True
+    assert out["workspace_paths_updated"] is True
     plugin_root = cfg_root / "plugins" / "hermes-core"
     assert (plugin_root / "plugin.json").is_file()
-    assert (plugin_root / "rules" / "AGENTS.md").is_file()
+    agents_file = plugin_root / "rules" / "AGENTS.md"
+    assert agents_file.is_file()
+    agents_txt = agents_file.read_text(encoding="utf-8")
+    assert str(scratch_dir.resolve()) in agents_txt
+    assert str(projects_dir.resolve()) in agents_txt
     mcp_cfg = json.loads((plugin_root / "mcp_config.json").read_text(encoding="utf-8"))
     assert mcp_cfg["mcpServers"]["hermes-core"]["command"] == str(Path(PY).resolve())
     hooks_cfg = json.loads((plugin_root / "hooks.json").read_text(encoding="utf-8"))
@@ -81,7 +100,12 @@ def test_installer_isolated(tmp: Path) -> Path:
     global_cfg = json.loads((cfg_root / "config.json").read_text(encoding="utf-8"))
     assert global_cfg["plugins"]["hermes-core"]["enabled"] is True
     settings = json.loads((plugin_root / "data" / "plugin_settings.json").read_text(encoding="utf-8"))
-    assert settings == {"mode": "standalone", "hermes_home": None}
+    assert settings == {
+        "mode": "standalone",
+        "hermes_home": None,
+        "scratch_dir": str(scratch_dir.resolve()),
+        "projects_dir": str(projects_dir.resolve()),
+    }
     print("[PASS] 1. Isolated install.py standalone deployment verified")
     return plugin_root
 
@@ -289,6 +313,102 @@ def test_hooks_lifecycle(plugin_root: Path, env: dict[str, str], data_dir: Path,
     print("[PASS] 5. Hooks SessionStart, PreInvocation, PostToolUse telemetry/reset, and Stop anti-loop passed")
 
 
+def test_installer_upgrade_and_uninstall(tmp: Path) -> None:
+    cfg_root = tmp / "up_cfg"
+    installer = REPO_ROOT / "install.py"
+    up_plugin = cfg_root / "plugins" / "hermes-core"
+
+    # Initial install
+    subprocess.run(
+        [PY, str(installer), "--config-root", str(cfg_root), "--mode", "standalone", "--skip-backfill"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    agents_file = up_plugin / "rules" / "AGENTS.md"
+    marker = "\n# CUSTOM USER RULE PRESERVED\n"
+    agents_file.write_text(agents_file.read_text(encoding="utf-8") + marker, encoding="utf-8")
+
+    # Upgrade without --force-rules keeps custom AGENTS.md
+    up_proc = subprocess.run(
+        [PY, str(installer), "--config-root", str(cfg_root), "--mode", "standalone", "--skip-backfill"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    up_out = json.loads(up_proc.stdout)
+    assert up_out["rules_preserved"] is True and up_out["rules_backed_up"] is False
+    assert "# CUSTOM USER RULE PRESERVED" in agents_file.read_text(encoding="utf-8")
+
+    # Upgrade with --force-rules backs up custom file before replacing
+    force_proc = subprocess.run(
+        [PY, str(installer), "--config-root", str(cfg_root), "--mode", "standalone", "--skip-backfill", "--force-rules"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    force_out = json.loads(force_proc.stdout)
+    assert force_out["rules_preserved"] is False and force_out["rules_backed_up"] is True
+    assert "# CUSTOM USER RULE PRESERVED" not in agents_file.read_text(encoding="utf-8")
+    bak_file = up_plugin / "rules" / "AGENTS.md.bak"
+    assert bak_file.is_file() and "# CUSTOM USER RULE PRESERVED" in bak_file.read_text(encoding="utf-8")
+
+    # Seed standalone skill + memory + unrelated custom skills.json entry
+    sample_skill = up_plugin / "data" / "skills" / "sample-skill" / "SKILL.md"
+    sample_skill.parent.mkdir(parents=True, exist_ok=True)
+    sample_skill.write_text("---\nname: sample-skill\ndescription: sample\n---\n\nbody\n", encoding="utf-8")
+    subprocess.run(
+        [PY, str(installer), "--config-root", str(cfg_root), "--mode", "standalone", "--skip-backfill"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    skills_json_path = cfg_root / "skills.json"
+    sk_data = json.loads(skills_json_path.read_text(encoding="utf-8"))
+    custom_other = str((tmp / "custom_other_skills").resolve())
+    sk_data["entries"].insert(0, {"path": custom_other})
+    skills_json_path.write_text(json.dumps(sk_data, indent=2) + "\n", encoding="utf-8")
+    assert len(sk_data["entries"]) >= 2
+
+    mem_file = up_plugin / "data" / "memories" / "MEMORY.md"
+    mem_file.parent.mkdir(parents=True, exist_ok=True)
+    mem_file.write_text("Keep me across uninstall", encoding="utf-8")
+
+    # Standard uninstall removes plugin + managed entries while keeping memories/ and custom skills
+    un_proc = subprocess.run(
+        [PY, str(installer), "--config-root", str(cfg_root), "--uninstall"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    un_out = json.loads(un_proc.stdout)
+    assert un_out["success"] is True and un_out["removed_from_config_json"] is True
+    assert un_out["removed_skills_entries"] >= 1
+    cfg_after = json.loads((cfg_root / "config.json").read_text(encoding="utf-8"))
+    assert "hermes-core" not in cfg_after.get("plugins", {})
+    sk_after = json.loads(skills_json_path.read_text(encoding="utf-8"))
+    assert sk_after["entries"] == [{"path": custom_other}]
+    assert not (up_plugin / "server").exists() and not (up_plugin / "plugin.json").exists()
+    assert mem_file.read_text(encoding="utf-8") == "Keep me across uninstall"
+
+    # Purge uninstall removes everything inside plugins/hermes-core
+    subprocess.run(
+        [PY, str(installer), "--config-root", str(cfg_root), "--mode", "standalone", "--skip-backfill"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    purge_proc = subprocess.run(
+        [PY, str(installer), "--config-root", str(cfg_root), "--uninstall", "--purge-data"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert json.loads(purge_proc.stdout)["success"] is True
+    assert not up_plugin.exists()
+    print("[PASS] 6. Installer upgrade rule preservation, workspace paths, and clean --uninstall passed")
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
@@ -317,8 +437,9 @@ def main() -> int:
         test_fts5_recall(mcp_script, env, brain_dir)
         test_skills_and_curator(mcp_script, env, skills_dir, skills_json)
         test_hooks_lifecycle(plugin_root, env, data_dir, skills_dir, cfg_yaml)
+        test_installer_upgrade_and_uninstall(tmp)
 
-    print("ALL VERIFICATION TESTS PASSED (5/5)")
+    print("ALL VERIFICATION TESTS PASSED (6/6)")
     return 0
 
 

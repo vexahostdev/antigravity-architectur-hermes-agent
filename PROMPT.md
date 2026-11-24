@@ -16,7 +16,7 @@ First inspect the host environment (without printing secret file contents):
 Then ask the user 3 concise questions and wait for answers before writing to `~/.gemini/config/`:
 1. Memory and skills mode: if a Hermes directory exists, ask whether to share `memories/`, `skills/`, and read-only `state.db` bidirectionally with Hermes, or use standalone storage under `plugins/hermes-core/data/`.
 2. Persona and language: what language and communication style should `rules/AGENTS.md` enforce?
-3. Default scratch folder and optional local secrets file: where should non-project loose files be saved (never in root drives), and should an empty `~/.gemini/config/infra.env` template be prepared?
+3. Default workspace folders and optional local secrets file: ask where loose non-project files should be saved (suggest `~/antigravity-scratch` or `%USERPROFILE%\antigravity-scratch`, never drive roots), an optional default root folder for new projects (so routine work never needs directory prompts unless a new project target is ambiguous), and whether an empty `~/.gemini/config/infra.env` template should be prepared.
 
 ## Phase 1: Plugin manifests and rules (`~/.gemini/config/plugins/hermes-core/`)
 
@@ -31,7 +31,7 @@ Use **Python stdlib only** (zero external `pip` packages). Create:
    - Proactive bounded memory (`ServerName="hermes-core_hermes-core"`, `ToolName="memory"`): save preferences, environment facts, corrections, and milestones automatically; consolidate via `patch`/`remove`/`batch` near capacity; never store tokens or passwords; note rolling backups (`action="backups"`).
    - Active cross-session recall (`ServerName="hermes-core_hermes-core"`, `ToolName="session_search"`): immediately search prior sessions whenever the user references earlier chats or decisions.
    - Self-improving skills and Curator (`ServerName="hermes-core_hermes-core"`, `ToolName="skill_manage"`): create or patch reusable workflows, keep `SKILL.md` lean, put large references in `references/` or `scripts/`, support `pin`/`unpin`/`usage`/`curate`/`restore`, never force writes on review nudges.
-   - Workspace scratch hygiene: route standalone outputs to the user's scratch folder, never drive roots; scope searches to project folders.
+   - Workspace scratch hygiene: route loose outputs to the configured scratch folder (never drive roots), keep project work in its project folder (using the optional projects root for new projects), and only ask where to place files when a new project target is ambiguous; scope searches to project folders.
    - Local secrets vault rule (if `infra.env` used): parse via `split('=', 1)`, never echo secret values, prefer API tokens over browser login, and ask the user immediately if a remote server fails auth/connection (might have migrated).
 
 ## Phase 2: Implement 8 zero-dependency Python modules (`server/`)
@@ -76,7 +76,7 @@ Use **Python stdlib only** (zero external `pip` packages). Create:
 
 1. Plugin MCP servers register under `<plugin>_<server>` -> **`hermes-core_hermes-core`**. Both `AGENTS.md` and `hooks_runner.py` must use this exact name.
 2. Never place NTFS junctions inside `plugins/hermes-core/skills/` (Antigravity's plugin scanner skips junctions). Never put `~/` or regex/wildcards in `skills.json` (Antigravity does not expand `~/` and only matches exact names in `exclude`).
-3. Register `"hermes-core": {"enabled": true}` inside `~/.gemini/config/config.json` without removing existing settings.
+3. Register `"hermes-core": {"enabled": true}` inside `~/.gemini/config/config.json` without removing existing settings, and ask to disable any conflicting persistent memory plugin (such as `personal-memory`) if already enabled so `SessionStart` does not inject duplicate memory blocks.
 
 ## Phase 4: Sync, backfill, and isolated verification
 

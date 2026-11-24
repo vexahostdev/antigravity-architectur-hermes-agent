@@ -1,10 +1,38 @@
-# Antigravity x Hermes Core
+<div align="center">
+  <p>
+    <img src="assets/logos/antigravity-logo.png" alt="Google Antigravity" height="72" />
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    <img src="assets/logos/hermes-logo.png" alt="Hermes Agent" height="76" />
+  </p>
 
-[Pitfalls Guide](docs/ANTIGRAVITY_PITFALLS.md) | [Zero-Clone Prompt](PROMPT.md) | [Agent Install Spec](INSTALL_FOR_AGENTS.md)
+  <h1>Antigravity x Hermes Core</h1>
 
-Every new chat in Google Antigravity starts blank. `hermes-core` brings the closed learning loop from [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) into Antigravity using a single stdlib Python plugin, an MCP server, and four lifecycle hooks.
+  <p><strong>Bring the NousResearch Hermes Agent closed learning loop into Google Antigravity.</strong></p>
+  <p>Persistent bounded memory, SQLite FTS5 cross-session recall, and self-curating skills in one zero-dependency Python plugin.</p>
 
-Each time you open a new room, Antigravity automatically receives your curated `MEMORY.md` and `USER.md` snapshot, a digest of your last five conversations, full-text SQLite FTS5 search across past rooms, and self-curating skills that stay live across every workspace. Zero third-party `pip` dependencies required.
+  <p>
+    <a href="https://github.com/vexahostdev/antigravity-architectur-hermes-agent/stargazers"><img src="https://img.shields.io/github/stars/vexahostdev/antigravity-architectur-hermes-agent?style=flat&logo=github" alt="GitHub Stars" /></a>
+    <a href="https://github.com/vexahostdev/antigravity-architectur-hermes-agent/actions/workflows/ci.yml"><img src="https://github.com/vexahostdev/antigravity-architectur-hermes-agent/actions/workflows/ci.yml/badge.svg" alt="CI Tests" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License" /></a>
+    <img src="https://img.shields.io/badge/OS-Windows%20%7C%20macOS%20%7C%20Linux-3b82f6.svg" alt="Windows, macOS, Linux" />
+    <img src="https://img.shields.io/badge/python-3.10%2B%20stdlib-22c55e.svg" alt="Python 3.10+ stdlib" />
+    <img src="https://img.shields.io/badge/pip%20deps-0-111827.svg" alt="Zero pip dependencies" />
+  </p>
+
+  <p>
+    <a href="#quick-start-zero-manual-setup">Quick start</a> &middot;
+    <a href="#architecture-specs--honest-scope">Architecture</a> &middot;
+    <a href="#live-screenshots">Screenshots</a> &middot;
+    <a href="#real-world-antigravity-fixes-baked-in">Pitfalls</a> &middot;
+    <a href="PROMPT.md">Zero-clone prompt</a> &middot;
+    <a href="INSTALL_FOR_AGENTS.md">Agent spec</a> &middot;
+    <a href="#verification">Verification</a>
+  </p>
+
+  <p><code>python install.py --mode standalone</code></p>
+</div>
+
+Every new chat in Google Antigravity starts blank. `hermes-core` injects your curated `MEMORY.md` and `USER.md` snapshot, a digest of your last five conversations, incremental SQLite FTS5 cross-room search, and self-curating skills via one stdlib Python plugin, an MCP server, and four lifecycle hooks.
 
 ```mermaid
 ---
@@ -71,20 +99,29 @@ If you do not want to clone a repo at all, copy the self-contained build prompt 
 
 ### Option C: One-command local install
 
+On Windows, use `python` instead of `python3`.
+
 ```bash
 git clone https://github.com/vexahostdev/antigravity-architectur-hermes-agent.git
 cd antigravity-architectur-hermes-agent
-python3 install.py --mode standalone
+python3 install.py --mode standalone --scratch-dir ~/antigravity-scratch --projects-dir ~/Projects
 python3 tests/verify_all.py
 ```
 
 Already running Hermes Agent on the same machine? Point `install.py` at your existing `~/.hermes` (or `%LOCALAPPDATA%\hermes`) directory so Antigravity and Hermes share memories, skills, and read-only `state.db` history live:
 
 ```bash
-python3 install.py --mode shared
+python3 install.py --mode shared --scratch-dir ~/antigravity-scratch
 ```
 
-Then open a **New Chat** in Antigravity so the plugin, MCP server, hooks, and skills load into your session.
+Re-running `install.py` upgrades server modules without overwriting a customized `rules/AGENTS.md` (pass `--force-rules` to back up and reset it). If another memory plugin (such as `personal-memory`) is already installed in Antigravity, disable it under **Customizations -> Installed** so `SessionStart` does not inject duplicate memory blocks. Then open a **New Chat** so the plugin, MCP server, hooks, and skills load into your session.
+
+### Uninstall
+
+```bash
+python3 install.py --uninstall              # Keeps standalone memories/ and skills/
+python3 install.py --uninstall --purge-data # Removes everything cleanly
+```
 
 ---
 
@@ -162,7 +199,7 @@ Captured from a live Antigravity session with `hermes-core` active (private side
 
 ## Real-world Antigravity fixes baked in
 
-Building this surfaced five non-obvious Antigravity behaviors (double-namespaced `hermes-core_hermes-core` MCP IDs, `skills.json` rejecting `~/` and regex excludes, plugin scanners skipping directory junctions, Windows `msvcrt` zero-byte lock traps, and `Stop` hook `continuationActive` loops). Read the full breakdown in [docs/ANTIGRAVITY_PITFALLS.md](docs/ANTIGRAVITY_PITFALLS.md).
+Building this surfaced six non-obvious Antigravity behaviors (double-namespaced `hermes-core_hermes-core` MCP IDs, `skills.json` rejecting `~/` and regex excludes, plugin scanners skipping directory junctions, Windows `msvcrt` zero-byte lock traps, `Stop` hook `continuationActive` loops, and dual-scope strict/skill security scanning). Read the full breakdown in [docs/ANTIGRAVITY_PITFALLS.md](docs/ANTIGRAVITY_PITFALLS.md).
 
 ---
 
@@ -174,10 +211,22 @@ Run the isolated test suite anytime without touching live user memories, skills,
 python3 tests/verify_all.py
 ```
 
-It exercises `install.py`, MCP JSON-RPC calls, memory bounds and 15-file backup rotation, FTS5 search/redaction/deletion survival, skill CRUD/pinning/curator backups/restore, and all four lifecycle hooks inside a temporary directory.
+It exercises `install.py` (deployment, upgrade rule preservation, and `--uninstall`), MCP JSON-RPC calls, memory bounds and 15-file backup rotation, FTS5 search/redaction/deletion survival, skill CRUD/pinning/curator backups/restore, and all four lifecycle hooks inside a temporary directory.
+
+---
+
+## Star history
+
+<a href="https://www.star-history.com/#vexahostdev/antigravity-architectur-hermes-agent&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=vexahostdev/antigravity-architectur-hermes-agent&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=vexahostdev/antigravity-architectur-hermes-agent&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=vexahostdev/antigravity-architectur-hermes-agent&type=Date" />
+  </picture>
+</a>
 
 ---
 
 ## Attribution & License
 
-Architecture inspired by [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) (MIT License). Licensed under [MIT](LICENSE).
+Architecture inspired by [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) (MIT License). Google Antigravity and Hermes Agent marks belong to their respective owners. Licensed under [MIT](LICENSE).

@@ -1,6 +1,6 @@
 # Antigravity pitfalls fixed in hermes-core
 
-Building a memory and skills loop inside Antigravity sounds straightforward until you test it in a fresh chat room. These five quirks actually broke during live testing and shaped how `hermes-core` is built.
+Building a memory and skills loop inside Antigravity sounds straightforward until you test it in a fresh chat room. These six quirks actually broke during live testing and shaped how `hermes-core` is built.
 
 ## 1. Plugin MCP servers are double-namespaced
 

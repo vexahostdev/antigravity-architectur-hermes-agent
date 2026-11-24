@@ -30,8 +30,11 @@
 - When `[Hermes Learning Loop Review]` triggers at the end of a turn, evaluate honestly whether any durable memory or reusable skill emerged. Never force unnecessary writes; if nothing worth saving happened, reply briefly.
 
 ## 6. Workspace & Scratch Hygiene
-- Save loose non-project outputs (scratch scripts, drafts, exports) inside the user's configured scratch folder rather than root drive directories (`C:\`, `D:\`, `/`).
-- Scope file searches and commands to the specific project folder instead of scanning entire drives.
+<!-- hermes-core:workspace-paths -->
+- Save loose non-project outputs (scratch scripts, drafts, exports) inside the configured scratch folder rather than drive roots (`C:\`, `D:\`, `/`) or Desktop.
+- Keep project work inside the active project directory. Do not ask where to save files on routine tasks; only ask when creating a new project whose target folder is ambiguous.
+<!-- /hermes-core:workspace-paths -->
+- Scope file searches and commands to the active project folder instead of scanning entire drives.
 
 ## 7. Local Secrets Vault (Optional `infra.env`)
 - If `~/.gemini/config/infra.env` exists on disk, treat it as the local-only credential source for SSH/API/panel tokens.
